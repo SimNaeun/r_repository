@@ -1,0 +1,125 @@
+
+1. dplyr, ggplot2, readxl 패키지를 설치하고 스크립트에서 해당 패키지를 사용할 수 있도록 처리하고, “2014년_주거실태조사.xlsx” 엑셀파일 “조사결과” 시트를 불러와서 “exam_data”로 저장하고 
+“sido”의 숫자 데이터를 엑셀파일 “항목정의” 시트에 있는 문자로 변경하시오. (예: 11 -> 서울특별시 … 39 -> 제주특별자치도)
+﻿install.packages("dplyr")
+install.packages("ggplot2")
+install.packages("readxl")
+
+library(dplyr)
+library(ggplot2)
+library(readxl)
+
+exam_data<-read_excel("2014년_주거실태조사.xlsx", sheet = 1)
+
+exam_data$sido <- ifelse(exam_data$sido == 11, "서울특별시",exam_data$sido)
+exam_data$sido <- ifelse(exam_data$sido == 21, "부산광역시",exam_data$sido)
+exam_data$sido <- ifelse(exam_data$sido == 22, "대구광역시",exam_data$sido)
+exam_data$sido <- ifelse(exam_data$sido == 23, "인천광역시",exam_data$sido)
+exam_data$sido <- ifelse(exam_data$sido == 24, "광구광역시",exam_data$sido)
+exam_data$sido <- ifelse(exam_data$sido == 25, "대전광역시",exam_data$sido)
+exam_data$sido <- ifelse(exam_data$sido == 26, "울산광역시",exam_data$sido)
+exam_data$sido <- ifelse(exam_data$sido == 29, "세종특별자치시",exam_data$sido)
+exam_data$sido <- ifelse(exam_data$sido == 31, "경기도",exam_data$sido)
+exam_data$sido <- ifelse(exam_data$sido == 32, "강원도",exam_data$sido)
+exam_data$sido <- ifelse(exam_data$sido == 33, "충청북도",exam_data$sido)
+exam_data$sido <- ifelse(exam_data$sido == 34, "충청남도",exam_data$sido)
+exam_data$sido <- ifelse(exam_data$sido == 35, "전라북도",exam_data$sido)
+exam_data$sido <- ifelse(exam_data$sido == 36, "전라남도",exam_data$sido)
+exam_data$sido <- ifelse(exam_data$sido == 37, "경상북도",exam_data$sido)
+exam_data$sido <- ifelse(exam_data$sido == 38, "경상남도",exam_data$sido)
+exam_data$sido <- ifelse(exam_data$sido == 39, "제주특별자치도",exam_data$sido)
+
+2. 점유형태(q7) 자가, 전세, 보증금 있는 월세만 선택, 금융기관 대출금(q53_1_1)의 데이터가 없거나 모름/무응답 제외 후, 자가 전세, 월세의 금융기관 대출금 평균을 type_housing_loan에 저장하고
+자가, 전세, 월세 순으로 세로 막대 그래프를 그리시오.
+data_2 <- exam_data %>% select(q7, q53_1_1) %>% rename(type=q7, loan=q53_1_1)
+data_2$loan <- ifelse(data_2$loan == 9999999 , NA, data_2$loan)
+data_2 <- data_2 %>%
+  filter(type %in% c(1,2,3)) %>% 
+  filter(!is.na(loan))
+
+data_2$type <- ifelse(data_2$type == 1, "자가",data_2$type)
+data_2$type <- ifelse(data_2$type == 2, "전세",data_2$type)
+data_2$type <- ifelse(data_2$type == 3, "월세",data_2$type)
+
+typing_housing_loan <- data_2 %>%
+  group_by(type) %>% 
+  summarise(mean_loan = mean(loan))
+
+typing_housing_loan
+
+ggplot(data= typing_housing_loan,aes(x= type, y=mean_loan)) + 
+  geom_col() +
+  scale_x_discrete(limits = c("자가", "전세", "월세"))
+
+3. 광역시(sido)만 선택, 주택유형(q4) 아파트만 선택, 현재주택가격(q12_1)의 데이터가 없거나 모름/무응답 제외, 전용면적_평(q20_1_a)의 데이터가 없거나 모름/무응답 제외 후, 
+전국 광역시 아파트 평당 가격의 평균을 계산하여 가격이 비싼 3개 광역시와 평당 가격 평균을 apt_price에 저장하시오.
+data_3 <- exam_data %>% select(sido, q4, q12_1, q20_1_a) %>% rename(type=q4, price=q12_1, area=q20_1_a)
+data_3$price <- ifelse(data_3$price == 9999999 , NA, data_3$price)
+data_3$area <- ifelse(data_3$area == 999 , NA, data_3$area)
+
+data_3 <- data_3 %>%
+  filter(type == 4) %>% 
+  filter(!is.na(price) & !is.na(area)) %>% 
+  filter(sido %in% c("부산광역시","대구광역시","대전광역시","인천광역시","광주광역시","울산광역시"))
+  
+apt_price <-data_3 %>% 
+  group_by(sido) %>% 
+  summarise(mean_area_price = mean(price/area)) %>% 
+  arrange(desc(mean_area_price)) %>% 
+  head(3)
+
+4. 서울(sido) 자치구(sigungu)만 선택, 전세(q7)만 선택, 전세보증금(q15_1)의 데이터가 없거나 모름/무응답 제외 후, 서울 자치구별 전세보증금 평균을 계산하여 rant_deposit에 저장하고, 
+전세보증금이 큰 자지구부터 작은 자치구 순으로 정렬된 가로 막대 그래프를 그리시오.
+data_4 <- exam_data %>% select(sido, sigungu, q7, q15_1) %>% rename(type=q7, deposit=q15_1)
+data_4$deposit <- ifelse(data_4$deposit == 9999999 , NA, data_4$deposit)
+data_4 <- data_4 %>%
+  filter(sido == "서울특별시" & type == 2) %>% 
+  filter(!is.na(deposit))
+
+rant_deposit <- data_4 %>%
+  group_by(sigungu) %>% 
+  summarise(mean_deposit = mean(deposit))
+
+ggplot(data= rant_deposit,aes(x= reorder(sigungu, mean_deposit), y=mean_deposit)) + 
+  geom_col() +
+  coord_flip()
+
+5. 주택유형(q4) 일반단독주택, 다가구단독주택, 영업겸용단독주택, 아파트, 연립주택, 다세대주택 만 선택, 
+총 자산(q52_4)의 데이터가 없거나 모름/무응답 제외, 총 부채(q53_1_4)의 데이터가 없거나 모름/무응답 제외 후, 
+일반단독주택, 다가구단독주택, 영업겸용단독주택 은 모두 단독주택으로 데이터 변경하여 주택유형별 총 자산과 총 부채 데이터를 housing_asset에 저장하시오. 
+주택유형별 총 자산 평균과 총 부채 평균을 분리된 가로 막대 그래프로 그리시오.
+data_5 <- exam_data %>% select(q4, q52_4, q53_1_4) %>% rename(type=q4, asset = q52_4, debt=q53_1_4)
+data_5$asset <- ifelse(data_5$asset == 9999999 , NA, data_5$asset)
+data_5$debt <- ifelse(data_5$debt == 9999999 , NA, data_5$debt)
+data_5 <- data_5 %>%
+  filter(type %in% c(1,2,3,4,5,6)) %>% 
+  filter(!is.na(asset) & !is.na(debt))
+
+data_5$type <- ifelse(data_5$type == 1, "단독주택",data_5$type)
+data_5$type <- ifelse(data_5$type == 2, "단독주택",data_5$type)
+data_5$type <- ifelse(data_5$type == 3, "단독주택",data_5$type)
+data_5$type <- ifelse(data_5$type == 4, "아파트",data_5$type)
+data_5$type <- ifelse(data_5$type == 5, "연립주택",data_5$type)
+data_5$type <- ifelse(data_5$type == 6, "다세대주택",data_5$type)
+
+housing_asset <- data_5 %>%
+  group_by(type) %>% 
+  summarise(mean_asset = mean(asset), mean_debt = mean(debt))
+
+asset <- housing_asset %>%
+  select(type, mean_asset) %>% 
+  rename(mean=mean_asset)
+asset$division <- "asset"
+
+debt <- housing_asset %>%
+  select(type, mean_debt) %>% 
+  rename(mean=mean_debt)
+debt$division <- "debt"
+
+housing_asset <- bind_rows(asset, debt)
+
+ggplot(data= housing_asset, aes(x = type, y = mean, fill = division)) +
+  geom_col(position = "dodge")
+
+ggplot(data= housing_asset, aes(x = reorder(type, - mean), y = mean, fill = division)) +
+  geom_col(position = "dodge")
